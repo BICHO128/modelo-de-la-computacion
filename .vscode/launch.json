@@ -1,13 +1,21 @@
 {
     "version": "0.2.0",
     "configurations": [
-        {
-            "name": "Run Simulation",
-            "type": "python",
-            "request": "launch",
-            "program": "${workspaceFolder}/run_sim.py",
-            "args": ["--num", "30", "--pasos", "30"],
-            "console": "integratedTerminal"
-        }
+      {
+        "name": "Run Simulation",
+        "type": "python",
+        "request": "launch",
+        "program": "${workspaceFolder}/run_sim.py",
+        "args": ["--num", "30", "--pasos", "30"],
+        "console": "integratedTerminal"
+      },
+      {
+        "name": "Run Traffic Simulation",
+        "type": "python",
+        "request": "launch",
+        "program": "${workspaceFolder}/PARCIAL 1/simulation/trafico en una ciudad/run_traffic.py",
+        "args": ["--ancho", "20", "--alto", "20", "--pasos", "100"],
+        "console": "integratedTerminal"
+      }
     ]
 }
