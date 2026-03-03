@@ -61,11 +61,21 @@ PASOS_ROJO     = 50   # Cuántos frames dura el estado ROJO
 # Velocidad de los autos: celdas que avanzan por paso de animación
 VELOCIDAD_AUTO = 0.4
 
-# Distancia mínima entre autos para no colisionar (en celdas)
-DISTANCIA_SEGURIDAD = 1.2
+# Distancia mínima entre autos para no colisionar (en celdas).
+# Debe ser mayor que el lado largo del auto (1.0) + margen de separación visual.
+# Con DISTANCIA_SEGURIDAD = 1.8 garantizamos al menos 0.8 celdas de espacio libre
+# entre la trompa de un auto y la cola del auto de adelante.
+DISTANCIA_SEGURIDAD = 1.8
 
-# Distancia a la que el auto "ve" el semáforo y decide detenerse
-DISTANCIA_DETECCION_SEMAFORO = 2.5
+# Distancia a la que el auto "ve" el semáforo y decide detenerse.
+# Se amplía a 3.0 para que el auto frene con anticipación suficiente
+# antes de llegar a la línea de detención, evitando colas por reacción tardía.
+DISTANCIA_DETECCION_SEMAFORO = 3.0
+
+# Tolerancia lateral: margen en el eje perpendicular para considerar que
+# dos autos están en el mismo carril.  Debe ser menor que el ancho del carril
+# (ANCHO_CALLE / 2 ≈ 0.75) para no confundir autos de carriles opuestos.
+TOLERANCIA_LATERAL = 0.65
 
 # ══════════════════════════════════════════════════════════════════════════════
 #  SECCIÓN 2 — ENUMERACIONES (valores fijos con nombre legible)
@@ -332,32 +342,46 @@ class Auto:
         basadas en agentes: cada auto decide individualmente pero el resultado
         global es orden vial sin controlador central.
 
+        Mejora de separación visual:
+          - DISTANCIA_SEGURIDAD aumentada a 1.8 (> largo del auto 1.0 + margen 0.8)
+          - TOLERANCIA_LATERAL ajustada a 0.65 para no confundir carriles opuestos
+          - Se verifica tanto el centro del otro auto como su "cola" (centro - mitad largo)
+            para detectar el solapamiento antes de que ocurra visualmente.
+
         Retorna True si hay un auto bloqueando, False si la vía está libre.
         """
+        # Mitad del lado largo del auto (1.0 / 2 = 0.5) — tamaño del auto en su eje
+        MITAD_LARGO_AUTO = 0.5
+
         for otro_auto in lista_autos:
             if otro_auto.id_auto == self.id_auto:
                 continue              # No comparar el auto consigo mismo
 
-            # Calcular diferencia de posición según el eje de circulación
+            # Calcular diferencia de posición según el eje de circulación.
+            # diferencia_eje: cuánto está adelante el otro auto en el eje de avance.
+            # diferencia_lateral: separación en el eje perpendicular (¿mismo carril?).
             if self.sentido == SentidoVia.DERECHA:
-                diferencia_eje     = otro_auto.pos_x - self.pos_x   # Deben avanzar en X
-                diferencia_lateral = abs(otro_auto.pos_y - self.pos_y)  # En Y deben estar alineados
+                # Mi frente está en pos_x + MITAD_LARGO_AUTO
+                # La cola del otro está en otro_auto.pos_x - MITAD_LARGO_AUTO
+                diferencia_eje     = (otro_auto.pos_x - MITAD_LARGO_AUTO) - (self.pos_x + MITAD_LARGO_AUTO)
+                diferencia_lateral = abs(otro_auto.pos_y - self.pos_y)
             elif self.sentido == SentidoVia.IZQUIERDA:
-                diferencia_eje     = self.pos_x - otro_auto.pos_x
+                diferencia_eje     = (self.pos_x - MITAD_LARGO_AUTO) - (otro_auto.pos_x + MITAD_LARGO_AUTO)
                 diferencia_lateral = abs(otro_auto.pos_y - self.pos_y)
             elif self.sentido == SentidoVia.ARRIBA:
-                diferencia_eje     = otro_auto.pos_y - self.pos_y
+                diferencia_eje     = (otro_auto.pos_y - MITAD_LARGO_AUTO) - (self.pos_y + MITAD_LARGO_AUTO)
                 diferencia_lateral = abs(otro_auto.pos_x - self.pos_x)
             else:  # ABAJO
-                diferencia_eje     = self.pos_y - otro_auto.pos_y
+                diferencia_eje     = (self.pos_y - MITAD_LARGO_AUTO) - (otro_auto.pos_y + MITAD_LARGO_AUTO)
                 diferencia_lateral = abs(otro_auto.pos_x - self.pos_x)
 
-            # Un auto bloquea si está:
-            # - Adelante en su eje (diferencia_eje > 0)
-            # - Dentro de la distancia de seguridad
-            # - Lateralmente alineado (misma vía)
-            if (0 < diferencia_eje < DISTANCIA_SEGURIDAD and
-                    diferencia_lateral < 0.8):
+            # Un auto bloquea si:
+            #   1. Su cola está adelante del frente de este auto (diferencia_eje > -0.1)
+            #      El pequeño margen -0.1 tolera imprecisiones de punto flotante.
+            #   2. El espacio libre entre ambos es menor que DISTANCIA_SEGURIDAD.
+            #   3. Están en el mismo carril (diferencia lateral pequeña).
+            if (-0.1 < diferencia_eje < DISTANCIA_SEGURIDAD and
+                    diferencia_lateral < TOLERANCIA_LATERAL):
                 return True    # Hay un auto bloqueando el paso
 
         return False           # Vía libre adelante
@@ -485,10 +509,12 @@ class Ciudad:
             ),
         ]
 
-        # Contadores para controlar cada cuántos pasos se genera un nuevo auto
+        # Contadores para controlar cada cuántos pasos se genera un nuevo auto.
+        # Se aumenta a 22 pasos para dar más espacio entre autos consecutivos
+        # y evitar que aparezcan pegados al inicio de la vía.
         self.pasos_desde_ultimo_auto_horizontal = 0   # Contador para autos en eje X
         self.pasos_desde_ultimo_auto_vertical   = 0   # Contador para autos en eje Y
-        self.intervalo_generacion = 18                # Generar un auto cada 18 pasos
+        self.intervalo_generacion = 22                # Generar un auto cada 22 pasos
 
         # Contadores de estadísticas globales
         self.total_autos_creados    = 0   # Cuántos autos han existido en total
@@ -503,9 +529,29 @@ class Ciudad:
 
     # ── Métodos de generación de autos ────────────────────────────────────────
 
+    def _zona_entrada_libre(self, pos_x: float, pos_y: float) -> bool:
+        """
+        Verifica que la zona de entrada esté lo suficientemente despejada
+        antes de generar un nuevo auto.
+
+        Regla: ningún auto existente debe estar a menos de (DISTANCIA_SEGURIDAD + 1.0)
+        celdas del punto de entrada propuesto. El margen extra de 1.0 asegura
+        que el nuevo auto no aparezca "pegado" al último en entrar.
+
+        Retorna True si la entrada está libre y se puede generar el auto.
+        """
+        margen_entrada = DISTANCIA_SEGURIDAD + 1.0   # Zona de exclusión ampliada
+        for auto_existente in self.lista_autos:
+            distancia = ((auto_existente.pos_x - pos_x) ** 2 +
+                         (auto_existente.pos_y - pos_y) ** 2) ** 0.5
+            if distancia < margen_entrada:
+                return False   # Hay un auto demasiado cerca: no generar
+        return True            # Zona despejada: se puede generar
+
     def _generar_auto_horizontal(self):
         """
-        Crea un auto en uno de los dos extremos horizontales (izquierda o derecha).
+        Crea un auto en uno de los dos extremos horizontales (izquierda o derecha),
+        pero SOLO si la zona de entrada está despejada.
 
         El carril de entrada horizontal está desplazado +0.5 celdas del centro
         para el sentido DERECHA, y -0.5 para el sentido IZQUIERDA.
@@ -514,12 +560,16 @@ class Ciudad:
 
         if sentido == SentidoVia.DERECHA:
             # Entra por la izquierda, carril inferior del eje horizontal
-            pos_x_inicial = 0.0                       # Extremo izquierdo
+            pos_x_inicial = 0.0                            # Extremo izquierdo
             pos_y_inicial = CENTRO_Y + MITAD_CALLE * 0.5  # Carril → (arriba del centro)
         else:
             # Entra por la derecha, carril superior del eje horizontal
-            pos_x_inicial = float(ANCHO_CUADRICULA)   # Extremo derecho
+            pos_x_inicial = float(ANCHO_CUADRICULA)        # Extremo derecho
             pos_y_inicial = CENTRO_Y - MITAD_CALLE * 0.5  # Carril ← (abajo del centro)
+
+        # Solo crear el auto si la entrada está libre — evita solapamiento inicial
+        if not self._zona_entrada_libre(pos_x_inicial, pos_y_inicial):
+            return   # Entrada ocupada: no generar auto en este paso
 
         nuevo_auto = Auto(pos_x_inicial, pos_y_inicial, sentido)
         self.lista_autos.append(nuevo_auto)      # Agregar a la lista activa
@@ -527,7 +577,8 @@ class Ciudad:
 
     def _generar_auto_vertical(self):
         """
-        Crea un auto en uno de los dos extremos verticales (arriba o abajo).
+        Crea un auto en uno de los dos extremos verticales (arriba o abajo),
+        pero SOLO si la zona de entrada está despejada.
         """
         sentido = random.choice([SentidoVia.ARRIBA, SentidoVia.ABAJO])
 
@@ -539,6 +590,10 @@ class Ciudad:
             # Entra por arriba, carril izquierdo del eje vertical
             pos_x_inicial = CENTRO_X + MITAD_CALLE * 0.5   # Carril ↓ (lado izquierdo)
             pos_y_inicial = float(ALTO_CUADRICULA)          # Extremo superior
+
+        # Solo crear el auto si la entrada está libre — evita solapamiento inicial
+        if not self._zona_entrada_libre(pos_x_inicial, pos_y_inicial):
+            return   # Entrada ocupada: no generar auto en este paso
 
         nuevo_auto = Auto(pos_x_inicial, pos_y_inicial, sentido)
         self.lista_autos.append(nuevo_auto)
@@ -1076,11 +1131,22 @@ def ejecutar_simulacion(total_pasos: int = 300):
     ciudad       = Ciudad()                             # Crear el entorno
     visualizador = Visualizador(ciudad, total_pasos)    # Crear el visualizador
 
-    # Generar algunos autos iniciales para que la simulación comience con tráfico
-    for _ in range(3):
-        ciudad._generar_auto_horizontal()   # 3 autos horizontales iniciales
-    for _ in range(3):
-        ciudad._generar_auto_vertical()     # 3 autos verticales iniciales
+    # Generar autos iniciales bien separados para que la simulación comience
+    # con tráfico visible pero sin solapamientos.
+    # Se usan posiciones fijas escalonadas: cada auto a >DISTANCIA_SEGURIDAD+1
+    # celdas del siguiente para garantizar separación desde el primer frame.
+    autos_iniciales_horizontales = [
+        (2.0,  CENTRO_Y + MITAD_CALLE * 0.5, SentidoVia.DERECHA),   # Carril →
+        (18.0, CENTRO_Y - MITAD_CALLE * 0.5, SentidoVia.IZQUIERDA), # Carril ←
+    ]
+    autos_iniciales_verticales = [
+        (CENTRO_X - MITAD_CALLE * 0.5, 2.0,  SentidoVia.ARRIBA),    # Carril ↑
+        (CENTRO_X + MITAD_CALLE * 0.5, 18.0, SentidoVia.ABAJO),     # Carril ↓
+    ]
+    for px, py, sentido in autos_iniciales_horizontales + autos_iniciales_verticales:
+        auto_inicial = Auto(px, py, sentido)      # Crear auto en posición fija
+        ciudad.lista_autos.append(auto_inicial)   # Insertar directamente
+        ciudad.total_autos_creados += 1
 
     # ── Lanzar la animación ───────────────────────────────────────────────
     anim = visualizador.ejecutar()
