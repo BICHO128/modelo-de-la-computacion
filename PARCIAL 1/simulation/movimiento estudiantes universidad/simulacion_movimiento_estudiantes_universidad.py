@@ -8,11 +8,11 @@ Autor: Simulación basada en agentes
 Propósito: Entender dinámicas de ocupación en espacios universitarios
 """
 
-import matplotlib.pyplot as plt
-import matplotlib.animation as animation
-import numpy as np
-import random
-from enum import Enum
+import matplotlib.pyplot as plt # Para visualización de la simulación
+import matplotlib.animation as animation # Para crear animaciones de la simulación
+import numpy as np # Para cálculos numéricos y manejo de arrays
+import random # Para decisiones aleatorias en el comportamiento de los estudiantes
+from enum import Enum # Para definir ubicaciones del campus de forma clara y segura
 
 # =============================================================================
 # ENUMERACIÓN DE UBICACIONES
@@ -97,7 +97,9 @@ class Estudiante:
         nivel_ocupacion_actual = entorno.obtener_nivel_ocupacion(self.ubicacion_actual)
         
         # Si el lugar está cómodo (menos del 70% lleno), tiene 70% probabilidad de quedarse
+        # Contexto. Formula para decidir quedarse: si el lugar está menos del 70% lleno, entonces con probabilidad 0.7 se queda, de lo contrario considera moverse
         if nivel_ocupacion_actual < 0.7 and random.random() < 0.7:
+            # El random.random() < 0.7: Es una función que devuelve un número aleatorio entre 0 y 1. Si ese número es menor que 0.7, entonces el estudiante decide quedarse. Esto simula que incluso si el lugar está cómodo, no siempre se quedará (hay un 30% de probabilidad de que decida moverse de todos modos).
             return self.ubicacion_actual
         
         # Si llegó aquí, está considerando moverse

@@ -54,12 +54,12 @@ ANCHO_CALLE  = 3   # Celdas que ocupa cada calle (incluye ambos sentidos)
 MITAD_CALLE  = ANCHO_CALLE // 2    # = 1 — desplazamiento de cada carril al centro
 
 # Intervalos del ciclo de semáforo (en pasos de animación)
-PASOS_VERDE    = 40   # Cuántos frames dura el estado VERDE
-PASOS_AMARILLO = 10   # Cuántos frames dura el estado AMARILLO
-PASOS_ROJO     = 50   # Cuántos frames dura el estado ROJO
+PASOS_VERDE    = 40   # Cuántos frames dura el estado VERDE a segundos es aproximadamente 4 segundos a 10 fps
+PASOS_AMARILLO = 10   # Cuántos frames dura el estado AMARILLO a segundos es aproximadamente 1 segundo a 10 fps
+PASOS_ROJO     = 50   # Cuántos frames dura el estado ROJO a segundos es aproximadamente 5 segundos a 10 fps
 
 # Velocidad de los autos: celdas que avanzan por paso de animación
-VELOCIDAD_AUTO = 0.4
+VELOCIDAD_AUTO = 0.4 # 0.4 celdas por paso es un buen equilibrio para que los autos se muevan visiblemente pero no demasiado rápido, permitiendo observar su comportamiento ante semáforos y otros autos.
 
 # Distancia mínima entre autos para no colisionar (en celdas).
 # Debe ser mayor que el lado largo del auto (1.0) + margen de separación visual.
