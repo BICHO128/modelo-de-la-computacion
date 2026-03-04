@@ -340,9 +340,38 @@ class VisualizadorSimulacion:
     - Animar el movimiento
     - Mostrar estadísticas en tiempo real
     """
-    
+    # Número de pasos de tiempo a simular (por defecto: 100).
     def __init__(self, campus, pasos_simulacion=100):
         """
+        Nota sobre 'self':
+        'self' es la referencia a la instancia actual de la clase. Se pasa implícitamente
+        cuando se llama a un método de instancia y se utiliza para acceder y almacenar
+        los atributos (estado) del objeto. Al asignar valores a través de 'self', esos
+        valores persisten en la instancia y pueden ser usados por otros métodos.
+        Inicializa la visualización de la simulación.
+        Parámetros
+        ----------
+        campus : CampusUniversitario
+            El objeto que representa el estado espacial del campus y la posición de los estudiantes.
+        pasos_simulacion : int, opcional
+            Número de pasos de tiempo a simular (por defecto: 100).
+        Efectos (atributos creados)
+        ---------------------------
+        self.campus
+            Referencia al objeto campus provisto.
+        self.pasos_simulacion
+            Número total de pasos a simular.
+        self.paso_actual
+            Contador del paso de simulación en curso, inicia en 0.
+        self.fig, self.ax_campus, self.ax_estadisticas
+            Objetos de Matplotlib usados para la figura y los dos subgráficos:
+            - ax_campus: vista espacial del campus.
+            - ax_estadisticas: gráfico de ocupación en el tiempo.
+            
+        No devuelve valor.
+        
+        --------------------------
+        
         Prepara la visualización.
         
         Parámetros:
@@ -436,6 +465,9 @@ class VisualizadorSimulacion:
             )
         
         # Configura el gráfico del campus
+        # ¿Por qué estos límites? Para que el campus ocupe toda la ventana y se vea bien
+        # El espacio es de 100x100, así que ponemos límites de 0 a 100 en ambos ejes
+        # Esto también facilita la interpretación de las posiciones de los estudiantes
         self.ax_campus.set_xlim(0, 100)
         self.ax_campus.set_ylim(0, 100)
         self.ax_campus.set_aspect('equal')
